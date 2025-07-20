@@ -123,8 +123,11 @@ def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depen
         answer = QA_chain.invoke(question)
         # Ensure the answer is a string
         if isinstance(answer, dict):
-            answer = answer.get('result') or answer.get('answer') or str(answer)
-        return answer
+            # Join key-value pairs as 'key: value' lines, separated by newlines
+            answer_text = "\n".join(f"{key}: {value}" for key, value in answer.items())
+            return answer_text
+        else:
+            return str(answer)
     except Exception as e:
         print(f"Error in qa_pdf_by_id: {e}")
         raise HTTPException(status_code=500, detail=str(e))
