@@ -5,6 +5,9 @@ import PDFComponent from './pdf';
 
 export default function PdfList() {
   const [pdfs, setPdfs] = useState([]);
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [filter, setFilter] = useState();
   const didFetchRef = useRef(false);
@@ -121,6 +124,33 @@ you will need to restart the frontend.*/
     fetchPdfs(value);
   }
 
+  async function handleQuestionSubmit(e) {
+    e.preventDefault();
+    const selectedPdf = pdfs.find((pdf) => pdf.selected);
+    if (!selectedPdf) {
+      alert("Please select a PDF to ask about.");
+      return;
+    }
+
+    setIsLoading(true);
+    setAnswer('');
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pdfs/qa-pdf/${selectedPdf.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+
+    if (res.ok) {
+      const data = await res.text(); // assuming plain text response
+      setAnswer(data);
+    } else {
+      setAnswer('Error getting answer.');
+    }
+
+    setIsLoading(false);
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.mainInputContainer}>
@@ -138,6 +168,30 @@ you will need to restart the frontend.*/
         <button className={`${styles.filterBtn} ${filter === true && styles.filterActive}`} onClick={() => handleFilterChange(true)}>See Selected</button>
         <button className={`${styles.filterBtn} ${filter === false && styles.filterActive}`} onClick={() => handleFilterChange(false)}>See Not Selected</button>
       </div>
+
+      {pdfs.some(pdf => pdf.selected) && (
+        <form onSubmit={handleQuestionSubmit} className={styles.qaForm}>
+          <label>Ask a question about the selected PDF:</label>
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="e.g., What is this document about?"
+            className={styles.qaInput}
+            required
+          />
+          <button type="submit" className={styles.qaBtn}>
+            {isLoading ? 'Asking...' : 'Ask'}
+          </button>
+        </form>
+      )}
+
+      {answer && (
+        <div className={styles.answerBox}>
+          <strong>Answer:</strong>
+          <p>{answer}</p>
+        </div>
+      )}
     </div>
   );
 }
