@@ -123,8 +123,7 @@ def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depen
         answer = QA_chain.invoke(question)
         # Ensure the answer is a string
         if isinstance(answer, dict):
-            answer = answer.get("result", str(answer))
-        return answer
+            return answer.get("result", str(answer))
         else:
             return str(answer)
     except Exception as e:
