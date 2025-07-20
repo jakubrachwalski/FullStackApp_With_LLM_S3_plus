@@ -120,7 +120,7 @@ def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depen
             retriever=stored_embeddings.as_retriever()
         )
         question = question_request.question
-        answer = QA_chain.run(question)
+        answer = QA_chain.invoke(question)
         # Ensure the answer is a string
         if isinstance(answer, dict):
             answer = answer.get('result') or answer.get('answer') or str(answer)
