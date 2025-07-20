@@ -122,7 +122,7 @@ def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depen
             retriever=stored_embeddings.as_retriever()
         )
         question = question_request.question
-        answer = QA_chain.run(question)
+        answer = QA_chain.invoke(question)
         return answer
     except Exception as e:
         print(f"Error in qa_pdf_by_id: {e}")
