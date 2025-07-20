@@ -123,9 +123,8 @@ def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depen
         answer = QA_chain.invoke(question)
         # Ensure the answer is a string
         if isinstance(answer, dict):
-            # Join key-value pairs as 'key: value' lines, separated by newlines
-            answer_text = "\n".join(f"{key}: {value}" for key, value in answer.items())
-            return answer_text
+            answer = answer.get("result", str(answer))
+        return answer
         else:
             return str(answer)
     except Exception as e:
