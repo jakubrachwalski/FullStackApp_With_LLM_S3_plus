@@ -6,6 +6,8 @@ import crud
 from database import SessionLocal
 from uuid import uuid4
 
+from schemas import QuestionRequest
+
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import OpenAI
 from langchain.chains import LLMChain
