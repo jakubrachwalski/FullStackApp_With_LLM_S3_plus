@@ -13,3 +13,6 @@ class PDFResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class QuestionRequest(BaseModel):
+    question: str
