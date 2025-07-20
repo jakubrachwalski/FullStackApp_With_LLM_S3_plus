@@ -92,24 +92,22 @@ async def summarize_text(text: str):
 
 
 
+
 @router.post("/qa-pdf/{id}", response_class=PlainTextResponse)
 def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depends(get_db)):
     pdf = crud.read_pdf(db, id)
     if pdf is None:
         raise HTTPException(status_code=404, detail="PDF not found")
-    
     s3_url_prefix = f"https://{Settings().AWS_S3_BUCKET}.s3.amazonaws.com/"
-    if pdf.file.startswith(s3_url_prefix):
-        s3_key = pdf.file[len(s3_url_prefix):]
-    else:
+    if not pdf.file.startswith(s3_url_prefix):
         raise HTTPException(status_code=400, detail="Invalid S3 URL format")
-    
+    s3_key = pdf.file[len(s3_url_prefix):]
     s3_client = Settings.get_s3_client()
+    local_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
             local_path = tmp.name
             s3_client.download_fileobj(Settings().AWS_S3_BUCKET, s3_key, tmp)
-        
         loader = PyPDFLoader(local_path)
         document = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=400)
@@ -122,11 +120,14 @@ def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depen
             retriever=stored_embeddings.as_retriever()
         )
         question = question_request.question
-        answer = QA_chain.invoke(question)
+        answer = QA_chain.run(question)
+        # Ensure the answer is a string
+        if isinstance(answer, dict):
+            answer = answer.get('result') or answer.get('answer') or str(answer)
         return answer
     except Exception as e:
         print(f"Error in qa_pdf_by_id: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if 'local_path' in locals() and os.path.exists(local_path):
+        if local_path and os.path.exists(local_path):
             os.remove(local_path)
