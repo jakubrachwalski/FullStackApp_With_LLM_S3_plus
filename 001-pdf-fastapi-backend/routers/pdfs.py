@@ -19,6 +19,11 @@ from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.chains import RetrievalQA
 
+import boto3
+import tempfile
+import os
+from config import Settings
+
 
 router = APIRouter(prefix="/pdfs")
 
@@ -86,18 +91,39 @@ async def summarize_text(text: str):
 
 
 @router.post("/qa-pdf/{id}")
-def qa_pdf_by_id(id: int, question_request: QuestionRequest,db: Session = Depends(get_db)):
+def qa_pdf_by_id(id: int, question_request: QuestionRequest, db: Session = Depends(get_db)):
     pdf = crud.read_pdf(db, id)
     if pdf is None:
         raise HTTPException(status_code=404, detail="PDF not found")
     print(pdf.file)
-    loader = PyPDFLoader(pdf.file)
-    document = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000,chunk_overlap=400)
-    document_chunks = text_splitter.split_documents(document)
-    embeddings = OpenAIEmbeddings()
-    stored_embeddings = FAISS.from_documents(document_chunks, embeddings)
-    QA_chain = RetrievalQA.from_chain_type(llm=llm,chain_type="stuff",retriever=stored_embeddings.as_retriever())
-    question = question_request.question
-    answer = QA_chain.run(question)
-    return answer
+    
+    # Parse S3 key from your URL
+    # Example: https://mybucket20150713.s3.amazonaws.com/079b622f-fcf6-4ff5-9120-f4e1d230d22b-PerksPlus.pdf
+    # S3 key is everything after the bucket domain
+    s3_url_prefix = f"https://{Settings().AWS_S3_BUCKET}.s3.amazonaws.com/"
+    if pdf.file.startswith(s3_url_prefix):
+        s3_key = pdf.file[len(s3_url_prefix):]
+    else:
+        raise HTTPException(status_code=400, detail="Invalid S3 URL format")
+    
+    # Download PDF to a temporary file
+    s3_client = Settings.get_s3_client()
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        local_path = tmp.name
+        s3_client.download_fileobj(Settings().AWS_S3_BUCKET, s3_key, tmp)
+    
+    # Now load the PDF locally
+    try:
+        loader = PyPDFLoader(local_path)
+        document = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=400)
+        document_chunks = text_splitter.split_documents(document)
+        embeddings = OpenAIEmbeddings()
+        stored_embeddings = FAISS.from_documents(document_chunks, embeddings)
+        QA_chain = RetrievalQA.from_chain_type(llm=langchain_llm, chain_type="stuff", retriever=stored_embeddings.as_retriever())
+        question = question_request.question
+        answer = QA_chain.run(question)
+        return answer
+    finally:
+        # Clean up the temp file
+        os.remove(local_path)
