@@ -159,10 +159,13 @@ you will need to restart the frontend.*/
           <button className={styles.loadBtn} type="submit">Load PDF</button>
         </form>
       </div>
-      {!pdfs.length && <div>Loading...</div>}
-      {pdfs.map((pdf) => (
-        <PDFComponent key={pdf.id} pdf={pdf} onDelete={handleDeletePdf} onChange={handlePdfChange} />
-      ))}
+      {pdfs.length === 0 ? (
+        <div>No PDFs uploaded yet.</div>
+      ) : (
+        pdfs.map((pdf) => (
+          <PDFComponent key={pdf.id} pdf={pdf} onDelete={handleDeletePdf} onChange={handlePdfChange} />
+        ))
+      )}
       <div className={styles.filters}>
         <button className={`${styles.filterBtn} ${filter === undefined && styles.filterActive}`} onClick={() => handleFilterChange()}>See All</button>
         <button className={`${styles.filterBtn} ${filter === true && styles.filterActive}`} onClick={() => handleFilterChange(true)}>See Selected</button>

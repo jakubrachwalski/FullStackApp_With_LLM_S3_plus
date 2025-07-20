@@ -46,6 +46,23 @@ def delete_pdf(db: Session, id: int):
     db_pdf = db.query(models.PDF).filter(models.PDF.id == id).first()
     if db_pdf is None:
         return None
+
+    # Delete from S3
+    from config import Settings
+    import re
+    s3_client = Settings.get_s3_client()
+    bucket_name = Settings().AWS_S3_BUCKET
+
+    # Extract S3 key from the URL
+    s3_url_prefix = f"https://{bucket_name}.s3.amazonaws.com/"
+    if db_pdf.file.startswith(s3_url_prefix):
+        s3_key = db_pdf.file[len(s3_url_prefix):]
+        try:
+            s3_client.delete_object(Bucket=bucket_name, Key=s3_key)
+        except Exception as e:
+            print(f"Error deleting file from S3: {e}")
+            # Optionally handle/log or ignore if file doesn't exist
+
     db.delete(db_pdf)
     db.commit()
     return True
