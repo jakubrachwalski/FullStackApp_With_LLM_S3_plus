@@ -11,6 +11,12 @@ from langchain_openai import OpenAI
 from langchain.chains import LLMChain
 from langchain_core.runnables import RunnableSequence
 
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain.chains import RetrievalQA
+
 
 router = APIRouter(prefix="/pdfs")
 
@@ -74,3 +80,22 @@ summarize_chain = summarize_prompt | langchain_llm
 async def summarize_text(text: str):
     summary = summarize_chain.invoke(text)
     return {'summary': summary}
+
+
+
+@router.post("/qa-pdf/{id}")
+def qa_pdf_by_id(id: int, question_request: QuestionRequest,db: Session = Depends(get_db)):
+    pdf = crud.read_pdf(db, id)
+    if pdf is None:
+        raise HTTPException(status_code=404, detail="PDF not found")
+    print(pdf.file)
+    loader = PyPDFLoader(pdf.file)
+    document = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000,chunk_overlap=400)
+    document_chunks = text_splitter.split_documents(document)
+    embeddings = OpenAIEmbeddings()
+    stored_embeddings = FAISS.from_documents(document_chunks, embeddings)
+    QA_chain = RetrievalQA.from_chain_type(llm=llm,chain_type="stuff",retriever=stored_embeddings.as_retriever())
+    question = question_request.question
+    answer = QA_chain.run(question)
+    return answer
